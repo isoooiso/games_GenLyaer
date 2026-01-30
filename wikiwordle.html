@@ -1,0 +1,390 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>WikiWordle • Daily Web Quest</title>
+  <style>
+    :root{
+      --bg:#0f1115; --panel:#171a21; --panel2:#1f2430; --text:#e6e6e6; --muted:#9aa3b2;
+      --border:#2a2f3b; --tile:#121520;
+      --ok:#22c55e; --warn:#eab308; --bad:#3f3f46; --accent:#6ee7ff;
+    }
+    *{box-sizing:border-box}
+    body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial; background:var(--bg); color:var(--text)}
+    a{color:inherit}
+    .wrap{max-width:720px;margin:0 auto;padding:16px}
+    header{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}
+    .left{display:flex;flex-direction:column;gap:2px}
+    .title{font-size:18px;margin:0;letter-spacing:.4px}
+    .sub{margin:0;color:var(--muted);font-size:12px}
+    .topbar{display:flex;gap:10px;align-items:center;justify-content:space-between;margin:10px 0 12px 0;
+      background:linear-gradient(180deg,var(--panel),var(--panel2)); border:1px solid var(--border); border-radius:14px; padding:12px}
+    .btn{appearance:none;border:1px solid var(--border); background:#121622; color:var(--text);
+      padding:10px 12px;border-radius:12px; cursor:pointer; font-weight:600; font-size:13px}
+    .btn:hover{border-color:#3a4356}
+    .btn.primary{background:linear-gradient(180deg,#1d3440,#162833); border-color:#2f5b6a}
+    .btn.primary:hover{border-color:#3f7b90}
+    .btn.ghost{background:transparent}
+    .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+    .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+    .badge{font-size:12px;color:var(--muted)}
+    .card{background:linear-gradient(180deg,var(--panel),var(--panel2)); border:1px solid var(--border); border-radius:14px; padding:12px; margin-bottom:12px}
+    .clue-title{margin:0 0 6px 0;font-size:13px;color:#cde7ff}
+    .clue{margin:0;color:var(--text);line-height:1.35}
+    .board{display:grid;grid-template-rows:repeat(6, 1fr);gap:8px;justify-content:center;margin:14px 0}
+    .board-row{display:grid;grid-template-columns:repeat(5, 52px);gap:8px}
+    .tile{
+      width:52px;height:52px;border-radius:10px;
+      border:1px solid var(--border); background:var(--tile);
+      display:flex;align-items:center;justify-content:center;
+      font-weight:800;font-size:22px; text-transform:uppercase;
+      user-select:none;
+    }
+    .tile.filled{border-color:#3a4356}
+    .tile.g{background:rgba(34,197,94,.22); border-color:rgba(34,197,94,.55)}
+    .tile.y{background:rgba(234,179,8,.18); border-color:rgba(234,179,8,.55)}
+    .tile.b{background:rgba(63,63,70,.25); border-color:rgba(63,63,70,.55)}
+    .kbd{display:grid;gap:8px;justify-content:center}
+    .kbd-row{display:flex;gap:6px;justify-content:center;flex-wrap:wrap}
+    .key{
+      min-width:34px;height:44px;border-radius:12px;
+      border:1px solid var(--border); background:#121622; color:var(--text);
+      font-weight:800; cursor:pointer; user-select:none;
+      display:flex;align-items:center;justify-content:center;
+      padding:0 10px;
+    }
+    .key:hover{border-color:#3a4356}
+    .key.wide{min-width:74px}
+    .key.g{background:rgba(34,197,94,.18); border-color:rgba(34,197,94,.55)}
+    .key.y{background:rgba(234,179,8,.14); border-color:rgba(234,179,8,.55)}
+    .key.b{background:rgba(63,63,70,.22); border-color:rgba(63,63,70,.55)}
+    .toast{margin-top:10px;color:var(--muted);font-size:12px;min-height:16px}
+    .rightstack{display:flex;flex-direction:column;gap:6px;align-items:flex-end}
+    .mini{font-size:12px;color:var(--muted)}
+    .copy{cursor:pointer;text-decoration:underline;text-decoration-color:#2f5b6a}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div class="left">
+        <h1 class="title">WikiWordle</h1>
+        <p class="sub"><a href="./index.html">← Daily Web Quest</a> • источник: :contentReference[oaicite:9]{index=9}</p>
+      </div>
+      <div class="rightstack">
+        <div class="mini">Wallet: <span id="addr" class="mono"></span> <span id="copyAddr" class="copy">copy</span></div>
+        <div class="mini">Points: <span id="points" class="mono">0</span></div>
+      </div>
+    </header>
+
+    <div class="topbar">
+      <div class="row">
+        <button id="btnSync" class="btn primary">Generate today</button>
+        <button id="btnReload" class="btn">Reload clue</button>
+        <button id="btnReset" class="btn ghost">Reset local wallet</button>
+      </div>
+      <div class="badge">Day: <span id="day" class="mono">—</span></div>
+    </div>
+
+    <div class="card">
+      <div class="clue-title">Подсказка</div>
+      <p id="clue" class="clue">Нажми “Generate today”, если загадки на сегодня ещё не созданы.</p>
+      <p id="meta" class="mini" style="margin:8px 0 0 0"></p>
+    </div>
+
+    <div id="board" class="board"></div>
+
+    <div class="kbd" id="kbd"></div>
+
+    <div class="row" style="justify-content:space-between;margin-top:12px">
+      <button id="btnClaim" class="btn">Claim +1 point (if solved)</button>
+      <div class="toast" id="toast"></div>
+    </div>
+  </div>
+
+<script type="module">
+  // ====== CONFIG ======
+  const CONTRACT_ADDRESS = "PASTE_YOUR_CONTRACT_ADDRESS_HERE";
+
+  // ====== Imports (pinned GenLayerJS) ======
+  import { createClient, createAccount, generatePrivateKey } from "https://esm.sh/genlayer-js@0.18.9";
+  import { studionet } from "https://esm.sh/genlayer-js@0.18.9/chains";
+  import { TransactionStatus } from "https://esm.sh/genlayer-js@0.18.9/types";
+
+  // ====== Helpers ======
+  const $ = (id) => document.getElementById(id);
+  const toast = (msg) => { $("toast").textContent = msg || ""; };
+
+  function getOrCreatePrivateKey() {
+    const k = localStorage.getItem("dwq_pk");
+    if (k) return k;
+    const pk = generatePrivateKey();
+    localStorage.setItem("dwq_pk", pk);
+    return pk;
+  }
+
+  function resetWallet() {
+    localStorage.removeItem("dwq_pk");
+    location.reload();
+  }
+
+  const account = createAccount(getOrCreatePrivateKey());
+  $("addr").textContent = account.address;
+
+  $("copyAddr").onclick = async () => {
+    try { await navigator.clipboard.writeText(account.address); toast("Address copied."); }
+    catch { toast("Copy failed."); }
+  };
+
+  const client = createClient({ chain: studionet, account });
+  await client.initializeConsensusSmartContract(); // recommended before contract interactions :contentReference[oaicite:10]{index=10}
+
+  async function readToday() {
+    try{
+      const data = await client.readContract({
+        address: CONTRACT_ADDRESS,
+        functionName: "get_today_public",
+        args: [],
+      });
+      $("day").textContent = data?.day || "—";
+      const clue = data?.wiki?.clue || "Нажми “Generate today”…";
+      const title = data?.wiki?.title || "";
+      $("clue").textContent = clue;
+      $("meta").textContent = title ? `Featured article: ${title}` : "";
+      await refreshPoints();
+      return data;
+    }catch(e){
+      toast("Read error. Проверь CONTRACT_ADDRESS.");
+      console.error(e);
+    }
+  }
+
+  async function refreshPoints(){
+    try{
+      const p = await client.readContract({
+        address: CONTRACT_ADDRESS,
+        functionName: "get_points",
+        args: [account.address],
+      });
+      $("points").textContent = String(p ?? 0);
+    }catch(e){
+      console.error(e);
+    }
+  }
+
+  async function writeTx(functionName, args=[]) {
+    const hash = await client.writeContract({
+      address: CONTRACT_ADDRESS,
+      functionName,
+      args,
+      value: 0n,
+    });
+    toast("Tx sent: " + String(hash).slice(0,10) + "…");
+    const receipt = await client.waitForTransactionReceipt({
+      hash,
+      status: TransactionStatus.FINALIZED,
+      retries: 120,
+      interval: 2000,
+    });
+    toast("Tx finalized.");
+    return receipt;
+  }
+
+  $("btnSync").onclick = async () => {
+    try{
+      toast("Generating today… (validators will fetch web + LLM)");
+      await writeTx("sync_today", []);
+      await readToday();
+    }catch(e){
+      toast("Sync failed. See console.");
+      console.error(e);
+    }
+  };
+
+  $("btnReload").onclick = async () => { toast(""); await readToday(); };
+  $("btnReset").onclick = resetWallet;
+
+  // ====== Wordle UI ======
+  const ROWS = 6, COLS = 5;
+  let row = 0, col = 0;
+  let current = "";
+  let locked = false;
+  let solved = false;
+  let lastGuess = "";
+
+  const board = $("board");
+
+  function buildBoard(){
+    board.innerHTML = "";
+    for(let r=0;r<ROWS;r++){
+      const rr = document.createElement("div");
+      rr.className = "board-row";
+      for(let c=0;c<COLS;c++){
+        const t = document.createElement("div");
+        t.className = "tile";
+        t.id = `t-${r}-${c}`;
+        rr.appendChild(t);
+      }
+      board.appendChild(rr);
+    }
+  }
+
+  function setTile(r,c,ch,cls=""){
+    const el = $(`t-${r}-${c}`);
+    el.textContent = ch ? ch.toUpperCase() : "";
+    el.className = "tile" + (ch ? " filled" : "") + (cls ? " "+cls : "");
+  }
+
+  function paintRow(pattern){
+    for(let c=0;c<COLS;c++){
+      const ch = current[c] || "";
+      setTile(row,c,ch, pattern[c] || "");
+    }
+    // color keys
+    for(let c=0;c<COLS;c++){
+      const ch = current[c].toUpperCase();
+      const p = pattern[c];
+      const k = document.querySelector(`[data-k="${ch}"]`);
+      if(!k) continue;
+      // keep best color (g > y > b)
+      const hasG = k.classList.contains("g");
+      const hasY = k.classList.contains("y");
+      if(p==="g"){ k.classList.remove("y","b"); k.classList.add("g"); }
+      else if(p==="y" && !hasG){ k.classList.remove("b"); k.classList.add("y"); }
+      else if(p==="b" && !hasG && !hasY){ k.classList.add("b"); }
+    }
+  }
+
+  function buildKeyboard(){
+    const layout = [
+      ["Q","W","E","R","T","Y","U","I","O","P"],
+      ["A","S","D","F","G","H","J","K","L"],
+      ["ENTER","Z","X","C","V","B","N","M","⌫"]
+    ];
+    const root = $("kbd");
+    root.innerHTML = "";
+    for(const line of layout){
+      const r = document.createElement("div");
+      r.className = "kbd-row";
+      for(const key of line){
+        const b = document.createElement("button");
+        b.className = "key" + (key==="ENTER" ? " wide" : "") + (key==="⌫" ? " wide" : "");
+        b.textContent = key;
+        b.dataset.k = key.length===1 ? key : "";
+        b.onclick = () => onKey(key);
+        r.appendChild(b);
+      }
+      root.appendChild(r);
+    }
+  }
+
+  function renderCurrent(){
+    for(let c=0;c<COLS;c++){
+      const ch = current[c] || "";
+      setTile(row,c,ch,"");
+    }
+  }
+
+  function onKey(k){
+    if(locked || solved) return;
+
+    if(k==="⌫" || k==="Backspace"){
+      if(current.length>0){
+        current = current.slice(0,-1);
+        col = current.length;
+        renderCurrent();
+      }
+      return;
+    }
+
+    if(k==="ENTER" || k==="Enter"){
+      submitGuess();
+      return;
+    }
+
+    if(/^[A-Z]$/.test(k)){
+      if(current.length<COLS){
+        current += k.toLowerCase();
+        col = current.length;
+        renderCurrent();
+      }
+    }
+  }
+
+  async function submitGuess(){
+    if(current.length!==COLS){
+      toast("Need 5 letters.");
+      return;
+    }
+    locked = true;
+    toast("Checking…");
+    try{
+      const pat = await client.readContract({
+        address: CONTRACT_ADDRESS,
+        functionName: "eval_wiki_guess",
+        args: [current],
+      });
+
+      if(!pat || String(pat).length!==5){
+        toast("Not ready yet. Try “Generate today”.");
+        locked = false;
+        return;
+      }
+
+      paintRow(String(pat));
+      lastGuess = current;
+
+      if(String(pat)==="ggggg"){
+        solved = true;
+        toast("Solved! You can Claim +1 point.");
+      } else {
+        row += 1;
+        current = "";
+        col = 0;
+        if(row>=ROWS){
+          toast("No more tries. Come back tomorrow (UTC).");
+        } else {
+          toast("");
+        }
+      }
+    }catch(e){
+      console.error(e);
+      toast("Error. Check console / contract address.");
+    }finally{
+      locked = false;
+      renderCurrent();
+    }
+  }
+
+  document.addEventListener("keydown", (e)=>{
+    if(e.key==="Backspace") onKey("Backspace");
+    else if(e.key==="Enter") onKey("Enter");
+    else {
+      const k = e.key.toUpperCase();
+      if(/^[A-Z]$/.test(k)) onKey(k);
+    }
+  });
+
+  $("btnClaim").onclick = async () => {
+    if(!solved){
+      toast("Solve it first.");
+      return;
+    }
+    try{
+      toast("Claiming…");
+      await writeTx("claim_wiki_point", [lastGuess]);
+      await refreshPoints();
+      toast("Claim done.");
+    }catch(e){
+      console.error(e);
+      toast("Claim failed.");
+    }
+  };
+
+  buildBoard();
+  buildKeyboard();
+  await readToday();
+</script>
+</body>
+</html>
