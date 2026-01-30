@@ -3,357 +3,59 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Daily Web Quest Hub (GenLayer Studio)</title>
+  <title>Daily Web Quest</title>
   <style>
-    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; max-width: 980px; margin: 24px auto; padding: 0 16px; }
-    .row { display:flex; gap:12px; flex-wrap: wrap; align-items:center; }
-    .card { border:1px solid #eee; border-radius: 16px; padding: 14px; }
-    button { padding: 10px 14px; border-radius: 12px; border: 1px solid #ccc; background:#fff; cursor:pointer; }
-    button.primary { border-color:#111; }
-    button.tab { border-color:#ddd; }
-    button.tab.active { border-color:#111; font-weight:700; }
-    input { padding: 10px 12px; border-radius: 12px; border:1px solid #ccc; font-size:16px; }
-    code { background:#f6f6f6; padding:2px 6px; border-radius:8px; }
-    .muted { color:#666; }
-    a { color: inherit; }
-    .grid { display:flex; gap:6px; flex-wrap: wrap; }
-    .sq { width: 36px; height: 36px; border-radius: 12px; display:flex; align-items:center; justify-content:center; border:1px solid #ddd; font-weight:800; }
-    .G { background:#2ecc71; border-color:#2ecc71; }
-    .Y { background:#f1c40f; border-color:#f1c40f; }
-    .B { background:#e5e7eb; border-color:#e5e7eb; }
-    .hist { margin-top:10px; display:grid; gap:8px; }
-    .histItem { border:1px solid #f0f0f0; border-radius:12px; padding:10px; }
-    .right { margin-left:auto; }
-    .hide { display:none; }
+    :root{
+      --bg:#0f1115; --panel:#171a21; --panel2:#1f2430; --text:#e6e6e6; --muted:#9aa3b2;
+      --accent:#6ee7ff; --ok:#22c55e; --warn:#eab308; --bad:#3f3f46; --border:#2a2f3b;
+    }
+    *{box-sizing:border-box}
+    body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial; background:var(--bg); color:var(--text)}
+    .wrap{max-width:980px;margin:0 auto;padding:28px 18px}
+    header{display:flex;align-items:center;justify-content:space-between;gap:14px;margin-bottom:18px}
+    .brand{display:flex;flex-direction:column;gap:2px}
+    .brand h1{margin:0;font-size:22px;letter-spacing:.4px}
+    .brand p{margin:0;color:var(--muted);font-size:13px}
+    .grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin-top:18px}
+    .card{background:linear-gradient(180deg,var(--panel),var(--panel2)); border:1px solid var(--border);
+      border-radius:16px;padding:16px; text-decoration:none; color:inherit; transition:transform .12s ease, border-color .12s ease}
+    .card:hover{transform:translateY(-2px);border-color:#3a4356}
+    .card h2{margin:0 0 8px 0;font-size:18px}
+    .card p{margin:0;color:var(--muted);line-height:1.35}
+    .pill{display:inline-flex;align-items:center;gap:8px;margin-top:12px;color:#bfefff;font-size:13px}
+    footer{margin-top:26px;color:var(--muted);font-size:12px}
+    @media (max-width:820px){.grid{grid-template-columns:1fr}}
   </style>
 </head>
 <body>
-  <h1>Daily Web Quest Hub</h1>
-  <p class="muted">
-    Две игры на одном сайте: <b>WikiWordle</b> и <b>ChronoGuess</b>.
-    Источник — Wikipedia страницы текущего UTC-дня.
-  </p>
+  <div class="wrap">
+    <header>
+      <div class="brand">
+        <h1>Daily Web Quest</h1>
+        <p>Две ежедневные мини-игры на базе Wikipedia (UTC-день).</p>
+      </div>
+      <div style="color:var(--muted);font-size:12px;text-align:right">
+        Studio-friendly • No token transfers
+      </div>
+    </header>
 
-  <div class="row">
-    <button id="btnConnect" class="primary">Подключить MetaMask</button>
-    <div>Адрес: <code id="addr">не подключен</code></div>
-    <div class="right muted" id="status">—</div>
+    <div class="grid">
+      <a class="card" href="./wikiwordle.html">
+        <h2>WikiWordle</h2>
+        <p>Wordle-стиль: угадай 5-буквенное слово по подсказке из featured-статьи дня.</p>
+        <div class="pill">▶ Играть</div>
+      </a>
+
+      <a class="card" href="./chronoguess.html">
+        <h2>ChronoGuess</h2>
+        <p>Историческая загадка: по описанию события “On This Day” угадай год.</p>
+        <div class="pill">▶ Играть</div>
+      </a>
+    </div>
+
+    <footer>
+      Источники: <span style="opacity:.9">Wikipedia feed API</span>. Хостинг: :contentReference[oaicite:8]{index=8}.
+    </footer>
   </div>
-
-  <div class="card" style="margin-top:14px;">
-    <div class="row">
-      <button id="btnSync" class="primary">Sync today (оба квеста)</button>
-      <button id="btnLoad">Load quests</button>
-      <button id="btnReveal">Reveal (debug)</button>
-      <button id="btnClearLocal" class="tab">Очистить локальную историю</button>
-    </div>
-    <div style="margin-top:10px;" class="muted">
-      Day: <code id="day">—</code> • Points: <code id="points">—</code>
-    </div>
-  </div>
-
-  <div class="row" style="margin-top:14px;">
-    <button class="tab active" id="tabWordle">WikiWordle</button>
-    <button class="tab" id="tabChrono">ChronoGuess</button>
-  </div>
-
-  <!-- PAGE 1: WORDLE -->
-  <section id="pageWordle" class="card" style="margin-top:12px;">
-    <h2 style="margin:0 0 8px;">WikiWordle</h2>
-    <div class="muted">Угадай 5-буквенное слово (a-z). Контракт берёт слово из Wikipedia страницы дня.</div>
-
-    <div style="margin-top:10px;">
-      <div><b>Source:</b> <a id="wSrc" href="#" target="_blank" rel="noreferrer">—</a></div>
-      <div style="margin-top:8px;"><b>Clue:</b></div>
-      <div id="wClue" class="muted">—</div>
-    </div>
-
-    <div class="row" style="margin-top:12px;">
-      <input id="wGuess" maxlength="5" placeholder="guess" />
-      <button id="btnWGuess" class="primary">Guess</button>
-      <div class="muted">Attempts: <code id="wAttempts">—</code> • Solved: <code id="wSolved">—</code></div>
-    </div>
-
-    <div style="margin-top:10px;">
-      <b>Последний фидбек:</b>
-      <div id="wLast" class="muted">—</div>
-      <div id="wFb" class="grid" style="margin-top:8px;"></div>
-    </div>
-
-    <div class="hist" id="wHist"></div>
-  </section>
-
-  <!-- PAGE 2: CHRONO -->
-  <section id="pageChrono" class="card hide" style="margin-top:12px;">
-    <h2 style="margin:0 0 8px;">ChronoGuess</h2>
-    <div class="muted">Угадай год (1000–2099). Контракт берёт событие с Wikipedia страницы дня и скрывает год.</div>
-
-    <div style="margin-top:10px;">
-      <div><b>Source:</b> <a id="cSrc" href="#" target="_blank" rel="noreferrer">—</a></div>
-      <div style="margin-top:8px;"><b>Clue:</b></div>
-      <div id="cClue" class="muted">—</div>
-    </div>
-
-    <div class="row" style="margin-top:12px;">
-      <input id="cGuess" inputmode="numeric" placeholder="year" />
-      <button id="btnCGuess" class="primary">Guess</button>
-      <div class="muted">Attempts: <code id="cAttempts">—</code> • Solved: <code id="cSolved">—</code></div>
-    </div>
-
-    <div style="margin-top:10px;">
-      <b>Последняя подсказка:</b>
-      <div id="cLast" class="muted">—</div>
-    </div>
-
-    <div class="hist" id="cHist"></div>
-  </section>
-
-<script type="module">
-  import { createClient } from "https://esm.run/genlayer-js";
-  import { studionet } from "https://esm.run/genlayer-js/chains";
-  import { TransactionStatus } from "https://esm.run/genlayer-js/types";
-
-  // Вставь адрес контракта из Studio
-  const CONTRACT_ADDRESS = "0xb63CbCefF6DC815cd74F81fb2810Bf00B819022d";
-
-  const $ = (id) => document.getElementById(id);
-  const setStatus = (s) => $("status").textContent = s;
-
-  let client = null;
-  let account = null;
-
-  // --- simple “two pages” routing ---
-  function showPage(which) {
-    const w = $("pageWordle"), c = $("pageChrono");
-    const tw = $("tabWordle"), tc = $("tabChrono");
-
-    if (which === "chrono") {
-      w.classList.add("hide"); c.classList.remove("hide");
-      tw.classList.remove("active"); tc.classList.add("active");
-      location.hash = "#chrono";
-    } else {
-      c.classList.add("hide"); w.classList.remove("hide");
-      tc.classList.remove("active"); tw.classList.add("active");
-      location.hash = "#wordle";
-    }
-  }
-
-  $("tabWordle").onclick = () => showPage("wordle");
-  $("tabChrono").onclick = () => showPage("chrono");
-
-  window.addEventListener("hashchange", () => {
-    if (location.hash === "#chrono") showPage("chrono");
-    else showPage("wordle");
-  });
-
-  // --- local history ---
-  function key(game, day) {
-    return `dq:${CONTRACT_ADDRESS}:${account || "anon"}:${day || "nodate"}:${game}`;
-  }
-
-  function loadHist(game, day) {
-    try { return JSON.parse(localStorage.getItem(key(game, day)) || "[]"); }
-    catch { return []; }
-  }
-
-  function saveHist(game, day, arr) {
-    localStorage.setItem(key(game, day), JSON.stringify(arr));
-  }
-
-  function clearAllLocal() {
-    // brute: clear only keys starting with dq:CONTRACT
-    const pref = `dq:${CONTRACT_ADDRESS}:`;
-    for (let i = localStorage.length - 1; i >= 0; i--) {
-      const k = localStorage.key(i);
-      if (k && k.startsWith(pref)) localStorage.removeItem(k);
-    }
-    renderHist();
-  }
-
-  function renderFeedbackBoxes(container, fb) {
-    container.innerHTML = "";
-    for (const ch of (fb || "")) {
-      const d = document.createElement("div");
-      d.className = "sq " + ch;
-      d.textContent = ch;
-      container.appendChild(d);
-    }
-  }
-
-  function renderHist() {
-    const day = $("day").textContent;
-    // Wordle history
-    const wh = loadHist("wordle", day);
-    $("wHist").innerHTML = "";
-    wh.forEach((it) => {
-      const el = document.createElement("div");
-      el.className = "histItem";
-      el.innerHTML = `<div><b>${it.guess}</b> • <code>${it.feedback}</code></div>`;
-      const fb = document.createElement("div");
-      fb.className = "grid";
-      fb.style.marginTop = "8px";
-      renderFeedbackBoxes(fb, it.feedback);
-      el.appendChild(fb);
-      $("wHist").appendChild(el);
-    });
-
-    // Chrono history
-    const ch = loadHist("chrono", day);
-    $("cHist").innerHTML = "";
-    ch.forEach((it) => {
-      const el = document.createElement("div");
-      el.className = "histItem";
-      el.innerHTML = `<div><b>${it.year}</b> • <span class="muted">${it.hint}</span></div>`;
-      $("cHist").appendChild(el);
-    });
-  }
-
-  // --- connect + tx helpers ---
-  async function connect() {
-    if (!window.ethereum) return alert("Нужен MetaMask");
-    const [addr] = await ethereum.request({ method: "eth_requestAccounts" });
-    account = addr;
-    $("addr").textContent = addr;
-
-    client = createClient({ chain: studionet, account: addr });
-    // SDK reference: call before deploying or interacting :contentReference[oaicite:7]{index=7}
-    await client.initializeConsensusSmartContract();
-    setStatus("connected");
-
-    // set default route
-    if (location.hash === "#chrono") showPage("chrono");
-    else showPage("wordle");
-
-    await loadAll();
-  }
-
-  async function waitTx(writePromise) {
-    const hash = await writePromise;
-    setStatus("tx sent: " + hash);
-    await client.waitForTransactionReceipt({
-      hash,
-      status: TransactionStatus.ACCEPTED,
-      retries: 80,
-      interval: 2500,
-    });
-    setStatus("tx accepted");
-  }
-
-  // --- contract reads ---
-  async function loadAll() {
-    if (!client) return;
-
-    // puzzles
-    const w = await client.readContract({ address: CONTRACT_ADDRESS, functionName: "get_wordle", args: [] });
-    const c = await client.readContract({ address: CONTRACT_ADDRESS, functionName: "get_chrono", args: [] });
-
-    $("day").textContent = w.day || c.day || "—";
-
-    $("wClue").textContent = w.clue || "—";
-    $("wSrc").textContent = w.source_url || "—";
-    $("wSrc").href = w.source_url || "#";
-
-    $("cClue").textContent = c.clue || "—";
-    $("cSrc").textContent = c.source_url || "—";
-    $("cSrc").href = c.source_url || "#";
-
-    if (account) {
-      const ws = await client.readContract({ address: CONTRACT_ADDRESS, functionName: "get_my_wordle", args: [account] });
-      const cs = await client.readContract({ address: CONTRACT_ADDRESS, functionName: "get_my_chrono", args: [account] });
-
-      $("points").textContent = ws.points ?? cs.points ?? "0";
-
-      $("wAttempts").textContent = ws.attempts;
-      $("wSolved").textContent = ws.solved;
-      $("wLast").textContent = ws.last_guess ? `${ws.last_guess} • ${ws.last_feedback}` : "—";
-      renderFeedbackBoxes($("wFb"), ws.last_feedback || "");
-
-      $("cAttempts").textContent = cs.attempts;
-      $("cSolved").textContent = cs.solved;
-      $("cLast").textContent = cs.last_hint ? `${cs.last_guess} • ${cs.last_hint}` : "—";
-    } else {
-      $("points").textContent = "—";
-    }
-
-    renderHist();
-  }
-
-  // --- actions ---
-  async function syncToday() {
-    if (!client) return alert("Connect first");
-    await waitTx(client.writeContract({ address: CONTRACT_ADDRESS, functionName: "sync_today", args: [], value: 0n }));
-    await loadAll();
-  }
-
-  async function guessWordle() {
-    if (!client) return alert("Connect first");
-    const g = $("wGuess").value.trim().toLowerCase();
-    if (!/^[a-z]{5}$/.test(g)) return alert("Нужно ровно 5 букв a-z");
-
-    await waitTx(client.writeContract({ address: CONTRACT_ADDRESS, functionName: "submit_wordle", args: [g], value: 0n }));
-
-    // after tx, read state to get last_feedback
-    const ws = await client.readContract({ address: CONTRACT_ADDRESS, functionName: "get_my_wordle", args: [account] });
-    const day = ws.day || $("day").textContent;
-
-    // save to local history
-    if (ws.last_guess && ws.last_feedback) {
-      const hist = loadHist("wordle", day);
-      // avoid duplicates on reload
-      const last = hist[hist.length - 1];
-      if (!last || last.guess !== ws.last_guess || last.feedback !== ws.last_feedback) {
-        hist.push({ guess: ws.last_guess, feedback: ws.last_feedback });
-        saveHist("wordle", day, hist);
-      }
-    }
-
-    await loadAll();
-    $("wGuess").value = "";
-  }
-
-  async function guessChrono() {
-    if (!client) return alert("Connect first");
-    const s = $("cGuess").value.trim();
-    if (!/^\d{4}$/.test(s)) return alert("Введи год из 4 цифр (например 1984)");
-    const y = BigInt(s);
-    await waitTx(client.writeContract({ address: CONTRACT_ADDRESS, functionName: "submit_chrono", args: [y], value: 0n }));
-
-    const cs = await client.readContract({ address: CONTRACT_ADDRESS, functionName: "get_my_chrono", args: [account] });
-    const day = cs.day || $("day").textContent;
-
-    if (cs.last_guess && cs.last_hint) {
-      const hist = loadHist("chrono", day);
-      const last = hist[hist.length - 1];
-      const item = { year: cs.last_guess, hint: cs.last_hint };
-      if (!last || String(last.year) !== String(item.year) || last.hint !== item.hint) {
-        hist.push(item);
-        saveHist("chrono", day, hist);
-      }
-    }
-
-    await loadAll();
-    $("cGuess").value = "";
-  }
-
-  async function reveal() {
-    if (!client) return alert("Connect first");
-    const r = await client.readContract({ address: CONTRACT_ADDRESS, functionName: "reveal", args: [] });
-    alert(
-      `DAY: ${r.day}\n\nWORDLE: ${r.wordle.answer}\n${r.wordle.excerpt}\n\nCHRONO: ${r.chrono.year}\n${r.chrono.excerpt}`
-    );
-  }
-
-  // --- wire up ---
-  $("btnConnect").onclick = connect;
-  $("btnSync").onclick = syncToday;
-  $("btnLoad").onclick = loadAll;
-  $("btnWGuess").onclick = guessWordle;
-  $("btnCGuess").onclick = guessChrono;
-  $("btnReveal").onclick = reveal;
-  $("btnClearLocal").onclick = clearAllLocal;
-
-  // initial page
-  if (location.hash === "#chrono") showPage("chrono"); else showPage("wordle");
-</script>
 </body>
 </html>
