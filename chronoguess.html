@@ -1,0 +1,264 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>ChronoGuess • Daily Web Quest</title>
+  <style>
+    :root{
+      --bg:#0f1115; --panel:#171a21; --panel2:#1f2430; --text:#e6e6e6; --muted:#9aa3b2;
+      --border:#2a2f3b; --accent:#6ee7ff; --ok:#22c55e; --warn:#eab308; --bad:#3f3f46;
+    }
+    *{box-sizing:border-box}
+    body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial; background:var(--bg); color:var(--text)}
+    a{color:inherit}
+    .wrap{max-width:720px;margin:0 auto;padding:16px}
+    header{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}
+    .title{font-size:18px;margin:0;letter-spacing:.4px}
+    .sub{margin:0;color:var(--muted);font-size:12px}
+    .topbar{display:flex;gap:10px;align-items:center;justify-content:space-between;margin:10px 0 12px 0;
+      background:linear-gradient(180deg,var(--panel),var(--panel2)); border:1px solid var(--border); border-radius:14px; padding:12px}
+    .btn{appearance:none;border:1px solid var(--border); background:#121622; color:var(--text);
+      padding:10px 12px;border-radius:12px; cursor:pointer; font-weight:600; font-size:13px}
+    .btn:hover{border-color:#3a4356}
+    .btn.primary{background:linear-gradient(180deg,#1d3440,#162833); border-color:#2f5b6a}
+    .btn.primary:hover{border-color:#3f7b90}
+    .btn.ghost{background:transparent}
+    .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+    .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+    .card{background:linear-gradient(180deg,var(--panel),var(--panel2)); border:1px solid var(--border); border-radius:14px; padding:12px; margin-bottom:12px}
+    .clue-title{margin:0 0 6px 0;font-size:13px;color:#cde7ff}
+    .clue{margin:0;color:var(--text);line-height:1.35}
+    .mini{font-size:12px;color:var(--muted)}
+    .copy{cursor:pointer;text-decoration:underline;text-decoration-color:#2f5b6a}
+    .input{
+      width:160px; padding:10px 12px; border-radius:12px;
+      border:1px solid var(--border); background:#0f1320; color:var(--text);
+      font-weight:800; font-size:14px;
+    }
+    .toast{margin-top:10px;color:var(--muted);font-size:12px;min-height:16px}
+    .hint{margin-top:10px;font-size:13px}
+    .hint.ok{color:#b7ffcf}
+    .hint.warn{color:#fff0b7}
+    .hint.bad{color:#d7d7db}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div>
+        <h1 class="title">ChronoGuess</h1>
+        <p class="sub"><a href="./index.html">← Daily Web Quest</a> • источник: :contentReference[oaicite:11]{index=11}</p>
+      </div>
+      <div style="text-align:right">
+        <div class="mini">Wallet: <span id="addr" class="mono"></span> <span id="copyAddr" class="copy">copy</span></div>
+        <div class="mini">Points: <span id="points" class="mono">0</span></div>
+      </div>
+    </header>
+
+    <div class="topbar">
+      <div class="row">
+        <button id="btnSync" class="btn primary">Generate today</button>
+        <button id="btnReload" class="btn">Reload clue</button>
+        <button id="btnReset" class="btn ghost">Reset local wallet</button>
+      </div>
+      <div class="mini">Day: <span id="day" class="mono">—</span></div>
+    </div>
+
+    <div class="card">
+      <div class="clue-title">Подсказка</div>
+      <p id="clue" class="clue">Нажми “Generate today”, если загадки на сегодня ещё не созданы.</p>
+      <p id="meta" class="mini" style="margin:8px 0 0 0"></p>
+    </div>
+
+    <div class="card">
+      <div class="row" style="justify-content:space-between">
+        <div class="row">
+          <input id="year" class="input" type="number" min="1" max="2100" placeholder="Year" />
+          <button id="btnGuess" class="btn">Guess</button>
+        </div>
+        <div class="mini">Tries: <span id="tries" class="mono">0</span>/6</div>
+      </div>
+      <div id="hint" class="hint"></div>
+      <div class="toast" id="toast"></div>
+      <div class="row" style="justify-content:space-between;margin-top:12px">
+        <button id="btnClaim" class="btn">Claim +1 point (if correct)</button>
+        <button id="btnClear" class="btn ghost">Clear tries</button>
+      </div>
+    </div>
+  </div>
+
+<script type="module">
+  const CONTRACT_ADDRESS = "PASTE_YOUR_CONTRACT_ADDRESS_HERE";
+
+  import { createClient, createAccount, generatePrivateKey } from "https://esm.sh/genlayer-js@0.18.9";
+  import { studionet } from "https://esm.sh/genlayer-js@0.18.9/chains";
+  import { TransactionStatus } from "https://esm.sh/genlayer-js@0.18.9/types";
+
+  const $ = (id) => document.getElementById(id);
+  const toast = (msg) => { $("toast").textContent = msg || ""; };
+
+  function getOrCreatePrivateKey() {
+    const k = localStorage.getItem("dwq_pk");
+    if (k) return k;
+    const pk = generatePrivateKey();
+    localStorage.setItem("dwq_pk", pk);
+    return pk;
+  }
+  function resetWallet(){ localStorage.removeItem("dwq_pk"); location.reload(); }
+
+  const account = createAccount(getOrCreatePrivateKey());
+  $("addr").textContent = account.address;
+  $("copyAddr").onclick = async () => {
+    try { await navigator.clipboard.writeText(account.address); toast("Address copied."); }
+    catch { toast("Copy failed."); }
+  };
+
+  const client = createClient({ chain: studionet, account });
+  await client.initializeConsensusSmartContract();
+
+  async function refreshPoints(){
+    try{
+      const p = await client.readContract({
+        address: CONTRACT_ADDRESS,
+        functionName: "get_points",
+        args: [account.address],
+      });
+      $("points").textContent = String(p ?? 0);
+    }catch(e){ console.error(e); }
+  }
+
+  async function readToday() {
+    try{
+      const data = await client.readContract({
+        address: CONTRACT_ADDRESS,
+        functionName: "get_today_public",
+        args: [],
+      });
+      $("day").textContent = data?.day || "—";
+      $("clue").textContent = data?.chrono?.clue || "Нажми “Generate today”…";
+      const title = data?.chrono?.title || "";
+      $("meta").textContent = title ? `OnThisDay topic: ${title}` : "";
+      await refreshPoints();
+      return data;
+    }catch(e){
+      toast("Read error. Проверь CONTRACT_ADDRESS.");
+      console.error(e);
+    }
+  }
+
+  async function writeTx(functionName, args=[]) {
+    const hash = await client.writeContract({
+      address: CONTRACT_ADDRESS,
+      functionName,
+      args,
+      value: 0n,
+    });
+    toast("Tx sent: " + String(hash).slice(0,10) + "…");
+    await client.waitForTransactionReceipt({
+      hash,
+      status: TransactionStatus.FINALIZED,
+      retries: 120,
+      interval: 2000,
+    });
+    toast("Tx finalized.");
+  }
+
+  $("btnSync").onclick = async () => {
+    try{
+      toast("Generating today…");
+      await writeTx("sync_today", []);
+      await readToday();
+    }catch(e){ toast("Sync failed."); console.error(e); }
+  };
+  $("btnReload").onclick = async () => { toast(""); await readToday(); };
+  $("btnReset").onclick = resetWallet;
+
+  // game state
+  let tries = 0;
+  let correct = false;
+  let lastYear = null;
+
+  function setHint(text, cls=""){
+    const h = $("hint");
+    h.textContent = text || "";
+    h.className = "hint " + (cls || "");
+  }
+
+  $("btnClear").onclick = () => {
+    tries = 0; correct = false; lastYear = null;
+    $("tries").textContent = "0";
+    setHint("");
+    toast("");
+  };
+
+  $("btnGuess").onclick = async () => {
+    const v = Number($("year").value);
+    if(!Number.isFinite(v) || v<1 || v>2100){
+      toast("Enter a year 1..2100");
+      return;
+    }
+    if(tries>=6 || correct){
+      toast(correct ? "Already correct. You can claim." : "No more tries.");
+      return;
+    }
+
+    tries += 1;
+    $("tries").textContent = String(tries);
+    toast("Checking…");
+
+    try{
+      const res = await client.readContract({
+        address: CONTRACT_ADDRESS,
+        functionName: "check_chrono_guess",
+        args: [v],
+      });
+
+      if(res?.status==="not_ready"){
+        toast("Not ready yet. Try “Generate today”.");
+        return;
+      }
+
+      lastYear = v;
+
+      if(res?.result==="correct"){
+        correct = true;
+        setHint("Correct! You can Claim +1 point.", "ok");
+        toast("");
+        return;
+      }
+      const diff = res?.diff ?? "?";
+      if(res?.result==="later"){
+        setHint(`Later → (off by ${diff})`, "warn");
+      }else if(res?.result==="earlier"){
+        setHint(`Earlier ← (off by ${diff})`, "warn");
+      }else{
+        setHint("Try again.", "bad");
+      }
+      toast("");
+    }catch(e){
+      console.error(e);
+      toast("Error. Check console.");
+    }
+  };
+
+  $("btnClaim").onclick = async () => {
+    if(!correct || lastYear==null){
+      toast("Get it correct first.");
+      return;
+    }
+    try{
+      toast("Claiming…");
+      await writeTx("claim_chrono_point", [lastYear]);
+      await refreshPoints();
+      toast("Claim done.");
+    }catch(e){
+      console.error(e);
+      toast("Claim failed.");
+    }
+  };
+
+  await readToday();
+</script>
+</body>
+</html>
